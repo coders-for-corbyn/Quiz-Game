@@ -1,0 +1,919 @@
+<!DOCTYPE HTML>
+<html style="height:100%">
+<!-- created by patricia curtis 01/09/2016 patricia.curtis@luckyredfish.com -->
+<head>
+	<title>Socialist Quiz</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			background-color: #ca0634;
+		}
+	</style>
+	<script src="pixi/pixi.js"></script>
+</head>
+<body style="height:100%" onresize="ScaleScreen();">
+	<div style="display:none">
+		<iframe id="questionFrame" src="questions.php"></iframe>
+	</div>
+	<!-- <div id="debug" style="font-size:20px;font-weight:bolder;color:white;"></div>	-->
+	<script>
+		var Question = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+		var Answers = [["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""], ["", "", "", ""]];
+		var Subject = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+		var QuestionCount = 50;
+
+
+		//--------------------------------------------------------------
+		//
+		//  defines constants
+		//
+		//--------------------------------------------------------------
+
+		const INIT = 0;
+		const START = 1;
+		const FRONT_END_DROP = 2;
+		const FRONT_END_SHRINK = 3;
+		const FRONT_END_EXPAND = 4;
+		const FRONT_SPIN = 5;
+		const QUESTIONS_DROP = 6;
+		const QUESTIONS_OUT = 7;
+		const STOP = -1;;
+		const policiesPACE = 200;
+		const FLARES = 20;
+
+		const SHARE_URL = "http://luckyredfish.com";
+		const SHARE_TITLE = "Lucky Red Fish";
+		const SHARE_HASH = "#luckyredfish";
+
+		//--------------------------------------------------------------
+		//
+		//  variables
+		//
+		//--------------------------------------------------------------
+
+
+		var WIDTH = 720;
+		var HEIGHT = 480
+		var ScreenWidth;
+		var ScreenHeight;
+		var ScreenLeftOffset;
+		var ScreenTopOffset
+		var BackgroundLeftOffset;
+		var BackgroundTopOffset
+		var ScreenScale;
+		var BackgroundScale;
+		var loader;
+		// create an new instance of a pixi stage
+		var stage;
+		// create a renderer instance.
+		var renderer;
+		// holder to store policies
+		var policies = [];
+		var answerBoxes = [];
+		var questionBox;
+		var SelectedQuestion;
+		var SelectedAnswer;    
+		var CorrectAnswer;
+		var lines = [];
+		var shadows = [];
+		var socials = [];
+		var buttonImages = ["QM_01.png", // employment
+								            "QM_02.png", // enviroment
+								            "QM_03.png", // housing
+								            "QM_04.png", // econemy
+								            "QM_05.png", // education
+								            "QM_06.png", // foreign policy
+								            "QM_07.png", // health
+								            "QM_08.png"] // immigration
+		var Atext = [];
+
+		var Qtext = new PIXI.Text( 'To play choose any card above to get a question on the revealed subject, and then select one of the possible answers. Good luck!', { wordWrap: true, wordWrapWidth: 620, fontSize: '22px', align: 'left', fill: 'white', lineHeight: 25, dropShadow: false, letterSpacing: 1, fontFamily: 'tahoma' } );
+
+		Atext[0] = new PIXI.Text( '', { wordWrap: true, wordWrapWidth: 300, fontSize: '22px', align: 'left', fill: 'white', lineHeight: 24, dropShadow: false, letterSpacing: 1, fontFamily: 'tahoma' } );
+		Atext[1] = new PIXI.Text( '', { wordWrap: true, wordWrapWidth: 300, fontSize: '22px', align: 'left', fill: 'white', lineHeight: 24, dropShadow: false, letterSpacing: 1, fontFamily: 'tahoma' } );
+		Atext[2] = new PIXI.Text( '', { wordWrap: true, wordWrapWidth: 300, fontSize: '22px', align: 'left', fill: 'white', lineHeight: 24, dropShadow: false, letterSpacing: 1, fontFamily: 'tahoma' } );
+		Atext[3] = new PIXI.Text( '', { wordWrap: true, wordWrapWidth: 300, fontSize: '22px', align: 'left', fill: 'white', lineHeight: 24, dropShadow: false, letterSpacing: 1, fontFamily: 'tahoma' } );
+
+		var	Scoretext = new PIXI.Text( '0', { wordWrap: true, wordWrapWidth: 300, fontSize: '60px', align: 'center', fill: 'white', lineHeight: 24, dropShadow: false, letterSpacing: 1,fontWeight:900, fontFamily: 'tahoma' } );
+
+		var flareColors = [0xffb1b1, 0xfffeb1, 0xb8ffb1, 0xb1f5ff];
+		var loopCount = ( Math.random() * 360 );
+		var gameMode = INIT;
+		var bouncer = 100;
+		var logoRadius = 100000
+		var questionHeight = -HEIGHT * 3;
+		var pressToPlay;
+		var logo;
+		var background;
+		var CardXPos = [-WIDTH / 3, 0, WIDTH / 3];
+		var timerBar = [];
+		var Cards = [];
+		var Covers = [];
+		var flares = [];
+		var flareSpeeds = [];
+		var policieX = [];
+		var policieY = [];
+		var flipFlop = false;
+		var Flashes = 0;
+		var mainMenu;
+		var backgroundContainer;
+		var flyingCard;
+		var FirstRun = false;
+		var QuestionsAsked = 0;
+		var Score		=	0;
+		//--------------------------------------------------------------
+		//
+		//  get the next state from a click
+		//
+		//--------------------------------------------------------------
+
+		function NextState()
+		{		
+			switch ( gameMode )
+			{
+				case FRONT_SPIN:
+					gameMode = FRONT_END_EXPAND;
+					break;
+			}
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  scale the screen variables depending on teh resolution
+		//
+		//--------------------------------------------------------------
+
+		function ScaleScreen()
+		{
+			ScreenWidth = parseInt( document.body.clientWidth ) - 4;
+			ScreenHeight = parseInt( document.body.clientHeight ) - 4;
+			var WindowRatio = ScreenWidth / ScreenHeight;
+			var GameRatio = 800 / 800;
+			var MagicNumber = GameRatio / WindowRatio;
+			var WidthScale = ( ScreenWidth / 800 );
+			var HeightScale = ( ScreenHeight / 800 );
+			if ( WidthScale < HeightScale )
+			{
+				ScreenScale = WidthScale;
+				BackgroundScale = HeightScale;
+			}
+			else
+			{
+				ScreenScale = HeightScale;
+				BackgroundScale = WidthScale;
+			}
+			ScreenLeftOffset = ( ScreenWidth - ( WIDTH * ScreenScale ) ) * 0.5;
+			ScreenTopOffset = ( ScreenHeight - ( HEIGHT * ScreenScale ) ) * 0.5;
+			BackgroundLeftOffset = ( ScreenWidth - ( WIDTH * BackgroundScale ) ) * 0.5;
+			BackgroundTopOffset = ( ScreenHeight - ( HEIGHT * BackgroundScale ) ) * 0.5;
+
+			//	document.getElementById('debug').innerHTML	=	BackgroundScale;
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  simple math to switch between radians and degrees
+		//
+		//--------------------------------------------------------------
+
+		// Converts from degrees to radians.
+		Math.radians = function ( degrees )
+		{
+			return degrees * Math.PI / 180;
+		};
+
+		// Converts from radians to degrees.
+		Math.degrees = function ( radians )
+		{
+			return radians * 180 / Math.PI;
+		};
+
+		//--------------------------------------------------------------
+		//
+		//  main menu
+		//
+		//--------------------------------------------------------------
+
+
+		function createMainMenu()
+		{
+			mainMenu = new PIXI.Container();
+
+			for ( var b = 0; b < 8; b++ )
+			{
+				shadows[b] = PIXI.Sprite.fromFrame( "QM_09.png" );
+				shadows[b].x = -HEIGHT;
+				shadows[b].y = -200;
+				shadows[b].anchor.x = 0.5;
+				shadows[b].anchor.y = 0.5;
+				shadows[b].scale.x = 1.4;
+				shadows[b].scale.y = 1.4;
+				shadows[b].alpha = 0.35;
+
+				mainMenu.addChild( shadows[b] );
+
+				policies[b] = PIXI.Sprite.fromFrame( buttonImages[b] );
+				policies[b].x = WIDTH / 2;
+				policies[b].y = -HEIGHT;
+				policies[b].scale.x = 0.75;
+				policies[b].scale.y = 0.75;
+				policies[b].anchor.x = 0.5;
+				policies[b].anchor.y = 0.5;
+				mainMenu.addChild( policies[b] );
+			}
+
+			logo = PIXI.Sprite.fromFrame( "logo.png" );
+			logo.x = WIDTH / 2;
+			logo.y = -HEIGHT;
+			logo.anchor.x = 0.5;
+			logo.anchor.y = 0.5;
+			logo.scale.x = 1;
+			logo.scale.y = 1;
+			logo.interactive	=	true;
+			logo.mousedown	=	NextState;
+			logo.touchstart	=	NextState; 
+			mainMenu.addChild( logo );
+
+			pressToPlay = PIXI.Sprite.fromFrame( "play.png" );
+			pressToPlay.visible = false;
+			pressToPlay.x = ( WIDTH / 2 );
+			pressToPlay.y = -HEIGHT;
+			pressToPlay.anchor.x = 0.5;
+			pressToPlay.anchor.y = 0.5;
+			pressToPlay.scale.x = 1;
+			pressToPlay.scale.y = 1;
+
+			mainMenu.addChild( pressToPlay );
+
+			mainMenu.scale.x = ScreenScale;
+			mainMenu.scale.y = ScreenScale;
+			mainMenu.x = ScreenLeftOffset;
+			mainMenu.y = ScreenTopOffset;
+
+			stage.addChild( mainMenu );
+		}
+
+		function updateMenu()
+		{
+			for ( var b = 0; b < 8; b++ )
+			{
+				policieX[b] = WIDTH / 2 + ( Math.sin( Math.radians(( b * 45 ) + loopCount ) ) * logoRadius );
+				policieY[b] = HEIGHT / 2 + ( Math.cos( Math.radians(( b * 45 ) + loopCount ) ) * logoRadius );
+				shadows[b].x = policieX[b] + 20;
+				shadows[b].y = policieY[b] + 20;
+				policies[b].x = policieX[b];
+				policies[b].y = policieY[b];
+			}
+			mainMenu.scale.x = ScreenScale;
+			mainMenu.scale.y = ScreenScale;
+			mainMenu.x = ScreenLeftOffset;
+			mainMenu.y = ScreenTopOffset;
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  create background
+		//
+		//--------------------------------------------------------------
+
+		function createBackground()
+		{
+			backgroundContainer = new PIXI.Container();
+
+			background = PIXI.Sprite.fromFrame( "background.png" );
+			background.x = WIDTH / 2;
+			background.y = HEIGHT / 2;
+			background.anchor.x = 0.5;
+			background.anchor.y = 0.5;
+			background.scale.x = ScreenWidth / background.width;
+			background.scale.y = ScreenHeight / background.height;
+			backgroundContainer.addChild( background );
+
+			// the rotating background
+			for ( var r = 0; r < FLARES; r++ )
+			{
+				flares[r] = PIXI.Sprite.fromFrame( "Flare.png" );
+				flares[r].x = WIDTH / 2 + ( Math.sin( Math.radians( r * 36 ) ) );
+				flares[r].y = HEIGHT / 2 + ( Math.cos( Math.radians( r * 36 ) ) );
+				flares[r].anchor.x = 0;
+				flares[r].anchor.y = 0.5;
+				flares[r].rotation = Math.radians( r * 36 );
+				flares[r].blendMode = PIXI.BLEND_MODES.ADD;
+				flares[r].alpha = 0.35;
+				flares[r].tint = flareColors[r % 3];
+				flares[r].scale.x = 1;
+				flares[r].scale.y = 1;
+				backgroundContainer.addChild( flares[r] )
+
+				flareSpeeds[r] = ( Math.random() * 40 ) + 10;
+			}
+			backgroundContainer.scale.x = BackgroundScale;
+			backgroundContainer.scale.y = BackgroundScale;
+			backgroundContainer.x = BackgroundLeftOffset;
+			backgroundContainer.y = BackgroundTopOffset;
+
+			stage.addChild( backgroundContainer );
+		}
+
+		function updateBackground()
+		{
+			for ( var r = 0; r < FLARES; r++ )
+			{
+				if ( r < ( FLARES / 2 ) )
+				{
+					flares[r].rotation += Math.radians( flareSpeeds[r] * 0.004 );
+				}
+				else
+				{
+					flares[r].rotation -= Math.radians( flareSpeeds[r] * 0.0045 );
+				}
+			}
+			backgroundContainer.scale.x = BackgroundScale;
+			backgroundContainer.scale.y = BackgroundScale;
+			backgroundContainer.x = BackgroundLeftOffset;
+			backgroundContainer.y = BackgroundTopOffset;
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  button events
+		//
+		//--------------------------------------------------------------
+
+		var SocialShareUrl;
+
+
+
+		function openShare()
+		{
+			var win = window.open( SocialShareUrl, '_blank' );
+			win.focus();
+		}
+
+		function shareFacebook()
+		{
+			SocialShareUrl = "http://www.facebook.com/share.php?u=" + encodeURI( SHARE_URL ) + "&title=" + encodeURI( SHARE_TITLE ) + "%20" + encodeURI( SHARE_HASH );
+			openShare();
+		}
+		function shareTwitter()
+		{
+			SocialShareUrl = "http://twitter.com/share?text=" + encodeURI( SHARE_TITLE ) + "&url=" + encodeURI( SHARE_URL ) + "&hashtags=" + encodeURI( SHARE_HASH );
+			openShare();
+		}
+		function shareGPlus()
+		{
+			SocialShareUrl = "https://plus.google.com/share?url=" + encodeURI( SHARE_URL );
+			openShare();
+		}
+		function shareLinkedin()
+		{
+			SocialShareUrl = "http://www.linkedin.com/shareArticle?mini=true&url=" + encodeURI( SHARE_URL ) + "&title=" + encodeURI( SHARE_TITLE ) + "&source=mini=true";
+			openShare();
+		}
+		function home()
+		{
+			gameMode = QUESTIONS_OUT;
+		}  
+
+		function refresh()
+		{
+		     document.getElementById('questionFrame').src	    = document.getElementById('questionFrame').src  ;
+
+		}
+
+		function gotolabour()
+		{
+			SocialShareUrl = "http://www.labour.org.uk/";
+			openShare();
+		}
+
+
+		//--------------------------------------------------------------
+		//
+		//  create Question screen
+		//
+		//--------------------------------------------------------------
+		function hideCover()
+		{
+			flyingCard = this;
+			disableCardsInterative();
+
+		}
+		function RsetCards()
+		{
+			for ( var c = 0; c < 12; c++ )
+			{
+				Cards[c].x = WIDTH / 2 + ( CardXPos[c % 3] );
+				Cards[c].y = questionBox.y - ( ( Math.floor( c / 3 ) * 107 ) + 107 );
+				Cards[c].anchor.x = 0.5;
+				Cards[c].anchor.y = 0.5;
+				Cards[c].scale.x = 0.65;
+				Cards[c].scale.y = 0.65;
+				Covers[c].x = Cards[c].x;
+				Covers[c].y = Cards[c].y;
+				Covers[c].anchor.x = 0.5;
+				Covers[c].anchor.y = 0.5;
+				Covers[c].scale.x = 0.66;
+				Covers[c].scale.y = 0.66;
+				Covers[c].interactive = false;
+				Covers[c].mousedown = hideCover; 
+				Covers[c].touchstart	=	hideCover; 
+
+			}
+		}
+		function enableCardsInterative()
+		{
+			for ( var c = 0; c < 12; c++ )
+			{
+				Covers[c].interactive = true;
+
+			}
+		}
+		function disableCardsInterative()
+		{
+			for ( var c = 0; c < 12; c++ )
+			{
+				Covers[c].interactive = false;
+
+			}
+		}
+		function ShowCrorrect()
+		{
+			if(flipFlop==false)
+			{
+				flipFlop = true;
+				if(CorrectAnswer==SelectedAnswer)
+				{
+					 answerBoxes[CorrectAnswer].setTexture( PIXI.Texture.fromFrame( "Boxes_03.png" ) );
+				}
+				else
+				{
+					 answerBoxes[CorrectAnswer].setTexture( PIXI.Texture.fromFrame( "Boxes_03.png" ) );
+				}
+			}
+			else
+			{
+				if(CorrectAnswer==SelectedAnswer)
+				{
+					 answerBoxes[CorrectAnswer].setTexture( PIXI.Texture.fromFrame( "Boxes_02.png" ) );
+				}
+				else
+				{
+					 answerBoxes[CorrectAnswer].setTexture( PIXI.Texture.fromFrame( "Boxes_01.png" ) );
+				}
+				flipFlop = false;
+			} 
+
+			
+			Flashes--;
+			if ( Flashes > 0 )
+			{
+				window.setTimeout( ShowCrorrect, 100 );
+			}
+			else
+			{
+				enableCardsInterative();
+				QuestionsAsked++;
+				if ( QuestionsAsked > 11 )
+				{
+					refresh(); 					
+				}
+				else
+				{						 					
+					Qtext.text	=	"Pick another card";					
+				}
+				for ( var a = 0; a < 4; a++ )
+				{
+					Atext[a].text	=	"";	
+					answerBoxes[a].setTexture( PIXI.Texture.fromFrame( "Boxes_01.png" ) );
+				}
+			}
+		}
+		function checkAnswer()
+		{
+
+			this.setTexture( PIXI.Texture.fromFrame( "Boxes_02.png" ) );
+			for ( var a = 0; a < 4; a++ )
+			{
+				if ( answerBoxes[a] == this )
+				{
+				    SelectedAnswer = a;
+				}
+				if ( Answers[SelectedQuestion][a].indexOf( "!" ) != -1 )
+				{
+				    CorrectAnswer	=	a;
+				}
+				answerBoxes[a].interactive = false;
+			}
+			if(CorrectAnswer==SelectedAnswer)
+			{
+				Score++;
+				Scoretext.text	=	Score.toString(10);
+			}
+			Flashes		=	20;
+			window.setTimeout( ShowCrorrect, 400 );
+		}	  	
+
+		function createQuestionScreen()
+		{
+			questionsContainer = new PIXI.Container();
+
+			Scoretext.anchor.x = 0.5;
+			Scoretext.anchor.y = 0.5;
+			Scoretext.scale.x = 1;
+			Scoretext.scale.y = 1;			    
+			Scoretext.y			=	-120;		 
+			Scoretext.x			=	WIDTH/2;
+			questionsContainer.addChild( Scoretext );
+			Scoretext.text	=	Score.toString(10);
+
+			for ( var l = 0; l < 6; l++ )
+			{
+				lines[l] = PIXI.Sprite.fromFrame( "Boxes_04.png" );
+				lines[l].anchor.x = 0.5;
+				lines[l].anchor.y = 0.5;
+				lines[l].scale.x = 1;
+				lines[l].scale.y = 1;
+				lines[l].animationSpeed = 0;
+				lines[l].readonlycurrentFrame = 0;
+				questionsContainer.addChild( lines[l] );
+
+			}
+			for ( var a = 0; a < 4; a++ )
+			{
+				answerBoxes[a] = PIXI.Sprite.fromFrame( "Boxes_01.png" );
+				answerBoxes[a].anchor.x = 0.5;
+				answerBoxes[a].anchor.y = 0.5;
+				answerBoxes[a].scale.x = 1;
+				answerBoxes[a].scale.y = 1;		    
+				answerBoxes[a].interactive	=	false;
+				answerBoxes[a].mousedown	=	checkAnswer;	
+				answerBoxes[a].touchstart	=	checkAnswer; 
+				Atext[a].anchor.x = 0;
+				Atext[a].anchor.y = 0.5;
+
+				Atext[a].x = -( answerBoxes[a].width - 120 ) / 2;
+				Atext[a].y = -2;
+				answerBoxes[a].addChild( Atext[a] );
+				questionsContainer.addChild( answerBoxes[a] );
+			}
+
+			lines[0].x = ( ( WIDTH / 2 ) - ( answerBoxes[0].width / 2 ) + 10 ) - ( lines[0].width );
+			lines[1].x = ( ( WIDTH / 2 ) + ( answerBoxes[0].width / 2 ) - 10 ) + ( lines[0].width );
+			lines[2].x = ( ( WIDTH / 2 ) - ( answerBoxes[0].width / 2 ) + 10 ) - ( lines[0].width );
+			lines[3].x = ( ( WIDTH / 2 ) + ( answerBoxes[0].width / 2 ) - 10 ) + ( lines[0].width );
+
+			lines[4].x = ( ( WIDTH / 2 ) + ( answerBoxes[0].width / 2 ) - 25 ) + ( lines[0].width );
+			lines[5].x = ( ( WIDTH / 2 ) - ( answerBoxes[0].width / 2 ) + 32 ) - ( lines[0].width );
+
+			answerBoxes[0].x = ( WIDTH / 2 ) - ( answerBoxes[0].width / 2 ) + 1;
+			answerBoxes[1].x = ( WIDTH / 2 ) + ( answerBoxes[1].width / 2 ) - 1;
+			answerBoxes[2].x = ( WIDTH / 2 ) - ( answerBoxes[0].width / 2 ) + 1;
+			answerBoxes[3].x = ( WIDTH / 2 ) + ( answerBoxes[1].width / 2 ) - 1;
+
+			answerBoxes[0].y = ( HEIGHT + 60 );
+			answerBoxes[1].y = ( HEIGHT + 60 );
+			answerBoxes[2].y = ( HEIGHT + 60 ) - answerBoxes[1].height;
+			answerBoxes[3].y = ( HEIGHT + 60 ) - answerBoxes[1].height;
+
+			questionBox = PIXI.Sprite.fromFrame( "qBox_01.png" );
+			questionBox.anchor.x = 0.5;
+			questionBox.anchor.y = 0.5;
+			questionBox.scale.x = 1;
+			questionBox.scale.y = 1;
+			questionsContainer.addChild( questionBox );
+
+			Qtext.anchor.x = 0;
+			Qtext.anchor.y = 0.5;
+
+			Qtext.x = -( questionBox.width - 200 ) / 2;
+			Qtext.y = -8;
+
+			questionBox.scale.x = 1;
+			questionBox.scale.y = 1;
+			questionBox.addChild( Qtext );
+
+			questionBox.x = ( WIDTH / 2 );
+			questionBox.y = ( HEIGHT - ( answerBoxes[1].height * 2.35 ) ) + 60;
+
+			lines[0].y = answerBoxes[1].y + 1;
+			lines[1].y = answerBoxes[1].y + 1;
+			lines[2].y = answerBoxes[3].y + 1;
+			lines[3].y = answerBoxes[3].y + 1;
+			lines[4].y = questionBox.y - 2;
+			lines[5].y = questionBox.y - 2;
+
+			for ( var c = 0; c < 12; c++ )
+			{
+				Cards[c] = PIXI.Sprite.fromFrame( "QM_0" + ( Subject[c] + 1 ) + ".png" );
+				questionsContainer.addChild( Cards[c] );
+				Covers[c] = PIXI.Sprite.fromFrame( "QM_10.png" );
+				questionsContainer.addChild( Covers[c] );
+			}
+			RsetCards();
+
+			questionsContainer.scale.x = ScreenScale;
+			questionsContainer.scale.y = ScreenScale;
+			questionsContainer.x = ScreenLeftOffset;
+			questionsContainer.y = ScreenTopOffset + questionHeight;
+			stage.addChild( questionsContainer );
+		}
+
+		function resetCards()
+		{
+			for ( var c = 0; c < 12; c++ )
+			{
+				Covers[c].x = Cards[c].x;
+				Covers[c].y = Cards[c].y;
+				Covers[c].anchor.x = 0.5;
+				Covers[c].anchor.y = 0.5;
+				Covers[c].scale.x = 0.66;
+				Covers[c].scale.y = 0.66;
+				Covers[c].alpha = 1;
+				Covers[c].rotation = 0;
+				Covers[c].interactive = false;
+				Covers[c].mousedown = hideCover;  
+				Covers[c].touchstart	=	hideCover; 
+				Cards[c].setTexture(PIXI.Texture.fromFrame( "QM_0" + ( Subject[c] + 1 ) + ".png" ))	;
+			}
+
+
+			Qtext.text = "To play choose any card above to get a question on the revealed subject, and then select one of the possible answers. Good luck!";
+			Atext[0].text = "";
+			Atext[1].text = "";
+			Atext[2].text = "";
+			Atext[3].text = "";
+		}
+
+		function updateQuestion()
+		{
+			questionsContainer.scale.x = ScreenScale;
+			questionsContainer.scale.y = ScreenScale;
+			questionsContainer.x = ScreenLeftOffset;
+			questionsContainer.y = ScreenTopOffset + questionHeight;
+			socials[5].y = 45 + questionHeight;
+			socials[6].y = 45 + questionHeight;
+		}
+		//--------------------------------------------------------------
+		//
+		//  add the Social Buttons
+		//
+		//--------------------------------------------------------------
+
+		function addSocialButtons()
+		{
+			socialContainer = new PIXI.Container();
+			for ( var s = 0 ; s < 4; s++ )
+			{
+				socials[s] = PIXI.Sprite.fromFrame( "social_0" + ( s + 1 ) + ".png" );
+				socials[s].anchor.y = 0.5;
+				socials[s].scale.x = 0.75;
+				socials[s].scale.y = 0.75;
+				socials[s].y = 40;
+				socials[s].x = ( s * 60 ) + ( WIDTH / 2 ) + 150;
+				socials[s].interactive = true;
+				socialContainer.addChild( socials[s] );
+			}
+			for ( var s = 4 ; s < 7; s++ )
+			{
+				socials[s] = PIXI.Sprite.fromFrame( "social_0" + ( s + 1 ) + ".png" );
+				socials[s].anchor.y = 0.5;
+				socials[s].scale.x = 1;
+				socials[s].scale.y = 1;
+				socials[s].y = 45;
+				socials[s].x = ( ( s - 4 ) * 80 ) - 50;
+				socials[s].interactive = true;
+				socialContainer.addChild( socials[s] );
+			}
+									  
+			socials[0].mousedown = shareFacebook; 
+			socials[1].mousedown = shareTwitter;
+			socials[2].mousedown = shareGPlus;
+			socials[3].mousedown = shareLinkedin;
+			socials[4].mousedown = gotolabour;
+			socials[5].mousedown = home;		    
+			socials[6].mousedown = refresh;
+			
+			socials[0].touchstart = shareFacebook; 
+			socials[1].touchstart = shareTwitter;
+			socials[2].touchstart = shareGPlus;
+			socials[3].touchstart = shareLinkedin;
+			socials[4].touchstart = gotolabour;
+			socials[5].touchstart = home;		    
+			socials[6].touchstart = refresh;
+			socials[5].y = 45 + questionHeight;
+			socials[6].y = 45 + questionHeight;
+
+
+			stage.addChild( socialContainer );
+			socialContainer.scale.x = ScreenScale;
+			socialContainer.scale.y = ScreenScale;
+			socialContainer.x = ScreenLeftOffset;
+			socialContainer.y = 0;
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  code start
+		//
+		//--------------------------------------------------------------
+
+		ScaleScreen();
+		loader = PIXI.loader;
+		// create an new instance of a pixi stage
+		stage = new PIXI.Container();
+		// create a renderer instance.
+		renderer = PIXI.autoDetectRenderer( ScreenWidth, ScreenHeight );
+
+		renderer.backgroundColor = 0x0ffffff;
+		renderer.view.autoResize = true;
+		// add the renderer view element to the DOM
+		document.body.appendChild( renderer.view );	   
+
+		function KickitOff()
+		{
+			if ( FirstRun == false )
+			{
+				FirstRun = true;
+				// load all the sprites from the texture
+				// create an array of assets to load
+				loader.add( "Spritesheet", "resources/quiz4.json" ); loader.load( function ( loader, resources )
+				{
+					createBackground();
+					createMainMenu();
+
+					createQuestionScreen();
+
+					addSocialButtons();
+
+					gameMode = START;
+					animate();
+				} );
+			}
+			else
+			{    		
+				resetCards();
+				enableCardsInterative();
+			}
+		}
+
+		//--------------------------------------------------------------
+		//
+		//  call back when the sprite sheet is loaded
+		//
+		//--------------------------------------------------------------
+
+
+		function animate()
+		{
+			//document.getElementById('debug').innerHTML = 	 ScreenScale;
+			requestAnimationFrame( animate );
+
+			updateBackground();
+			updateMenu();
+			updateQuestion();
+
+			switch ( gameMode )
+			{
+				case START:
+					gameMode = FRONT_END_DROP;
+					questionHeight = -HEIGHT * 3;
+					resetCards();
+					break;
+				case FRONT_END_DROP:
+					if ( bouncer > 50 )
+					{
+						logo.y += 50;
+					}
+					else
+					{
+						logo.y += bouncer;
+					}
+					if ( logo.y > ( HEIGHT / 2 ) )
+					{
+						if ( bouncer < 1 )
+						{
+							logo.y = ( HEIGHT / 2 );
+							gameMode = FRONT_END_SHRINK;
+							logoRadius = ( WIDTH / 2 ) + 200;
+						}
+						else
+						{
+							bouncer = -( bouncer * 0.75 );
+						}
+					}
+					else if ( bouncer < 0 && logo.position.y < ( HEIGHT / 2 ) )
+					{
+						bouncer = -( bouncer * 0.75 );
+					}
+					pressToPlay.y = logo.y ;//+ ( logo.height / 2 );
+					break;
+				case FRONT_END_SHRINK:
+					logoRadius -= 30;
+					if ( logoRadius < 320 )
+					{
+						logoRadius = 320
+						gameMode = FRONT_SPIN;
+					}
+					break;
+				case FRONT_END_EXPAND:
+					logoRadius += 60;
+					if ( logoRadius > ( WIDTH ) + 300 )
+					{
+						logoRadius = ( WIDTH ) + 300;
+						gameMode = QUESTIONS_DROP;
+						logo.x = WIDTH / 2;
+						logo.y = -logo.height*2;
+						bouncer = 100;
+						pressToPlay.visible = false;
+					}
+
+					logo.position.y += 60;
+					pressToPlay.y = logo.y + ( logo.height / 2 );
+					break;
+				case FRONT_SPIN:
+					if ( ( ( loopCount / 2 ) & 1 ) == 0 )
+					{
+						pressToPlay.visible = true;
+					}
+					else
+					{
+						pressToPlay.visible = false;
+					}
+
+					break;
+				case QUESTIONS_DROP:
+					if ( bouncer > 50 )
+					{
+						questionHeight += 50;
+					}
+					else
+					{
+						questionHeight += bouncer;
+					}
+					if ( questionHeight > 0 )
+					{
+						if ( bouncer < 1 )
+						{
+							questionHeight = 0;
+							gameMode = STOP;
+							enableCardsInterative();
+						}
+						else
+						{
+							bouncer = -( bouncer * 0.75 );
+						}
+					}
+					else if ( bouncer < 0 && questionHeight < 0 )
+					{
+						bouncer = -( bouncer * 0.75 );
+					}
+					break;
+				case QUESTIONS_OUT:
+					questionHeight += 60;
+					if ( questionHeight > HEIGHT * 2 )
+					{
+						gameMode = START;
+						RsetCards();
+					}
+					break;
+			}
+			if ( flyingCard != null )
+			{
+				flyingCard.scale.x += 0.05;
+				flyingCard.scale.y += 0.05;
+				flyingCard.alpha -= 0.02;
+				flyingCard.rotation += Math.radians( 2 );
+				flyingCard.y += 3;
+				if ( flyingCard.alpha <= 0 )
+				{
+					flyingCard.scale.x = 0;
+					flyingCard.scale.y = 0;
+					flyingCard.y = -HEIGHT;
+					for ( var c = 0; c < 12; c++ )
+					{
+						if ( Covers[c] == flyingCard )
+						{
+							SelectedQuestion = c;
+							Qtext.text = Question[c];
+							for(var a = 0;a<4;a++)
+							{
+								Atext[a].text = Answers[c][a].replace( "!", "" );
+								answerBoxes[a].setTexture( PIXI.Texture.fromFrame( "Boxes_01.png" )); 
+								answerBoxes[a].interactive = true;
+							}
+							break;
+						}
+					}
+					flyingCard = null;
+					
+				}
+			}
+			loopCount += 0.1;
+			// render the stage
+			renderer.render( stage );
+		}
+	</script>
+</body>
+</html>
